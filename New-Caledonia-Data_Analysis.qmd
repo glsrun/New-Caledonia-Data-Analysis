@@ -11,7 +11,7 @@ library(googlesheets4)
 library(dplyr)
 library(ggplot2)
 library(lubridate)
-library(stringr)
+library(stringr) 
 
 sheet_url <- "https://docs.google.com/spreadsheets/d/1J1mNN9AuM_pgOjtTf5w8CjcYtxe4E1Bx4cveOU6slIU"
 ouvea_sheets <- sheet_names(sheet_url)
@@ -51,7 +51,7 @@ ouvea_data <- ouvea_data |>  arrange(date_collected)
 ouvea_data <- ouvea_data |>  mutate(new_species = !duplicated(genus_species))
 new_species_daily <- ouvea_data |> 
   group_by(date_collected, collection_method) |> 
-  summarise(new_species = sum(new_species))
+  summarise(new_species = sum(new_species)) 
 ```
 
 Main summarizing functions
@@ -89,21 +89,48 @@ scale_x_date(
 
 
 
+new_species_daily <- new_species_daily |> 
+  mutate(vjust_pos = ifelse(collection_method == "snorkel", -2, 2))  
+  # Above for snorkel, below for dive
 
 ggplot(new_species_daily, aes(x = date_collected, 
                               y = new_species,
                               color= collection_method)) +
   geom_line() +
   geom_point()+
+ geom_segment(aes(x = date_collected, y = new_species, 
+                   xend = date_collected, yend = new_species + vjust_pos), 
+               linetype = "solid", color = "black") +  # Adjust the direction of the line
+  geom_text(aes(label = new_species ,vjust = vjust_pos), size = 3)+
   labs(title = "New Species Per Day",
      x= "Date Collected", 
        y= "Count",
-       fill="Collection Method")+
-  geom_text(aes(label = new_species), position = position_stack(vjust = 0.1))+
+       color="Collection Method")+
 scale_x_date(
     date_breaks = "1 day",    # show a tick for each date
     date_labels = "%e %b"     # format like "6 Jan", "7 Jan"
 )+
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
+
+ggplot(new_species_daily, aes(x = date_collected, 
+                              y = new_species,
+                              color = collection_method)) +
+  geom_line() +
+  geom_point() +
+  # Line to labels: Ensure correct direction of line to label
+  geom_curve(aes(x = date_collected, y = new_species, 
+                   xend = date_collected, yend = new_species + vjust_pos), 
+               linetype = "solid", color = "black", curvature = 0.1, alpha =0.6) +  
+  # Adjust label position using vjust (but for placement, not alignment)
+  geom_text(aes(label = new_species, y = new_species + vjust_pos), size = 3) +  
+  labs(title = "New Species Per Day",
+       x = "Date Collected", 
+       y = "Count",
+       color = "Collection Method") +
+  scale_x_date(
+    date_breaks = "1 day",    # Show a tick for each date
+    date_labels = "%e %b"     # Format like "6 Jan", "7 Jan"
+  ) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
