@@ -1,0 +1,109 @@
+---
+title: "Sea Slug Collection Summary"
+format: html
+editor: visual
+---
+
+## Start
+
+```{r}
+library(googlesheets4)
+library(dplyr)
+library(ggplot2)
+library(lubridate)
+library(stringr)
+
+sheet_url <- "https://docs.google.com/spreadsheets/d/1J1mNN9AuM_pgOjtTf5w8CjcYtxe4E1Bx4cveOU6slIU"
+ouvea_sheets <- sheet_names(sheet_url)
+
+ouvea_data <- lapply(ouvea_sheets, function(sheet) {
+  read_sheet(sheet_url, sheet = sheet) |>  mutate(date_sheet = sheet)
+}) |>  bind_rows()
+
+ouvea_data <- ouvea_data |> 
+  mutate(date_collected = as.Date(date))
+
+ouvea_data <- ouvea_data |> mutate(collection_method = case_when(
+    tolower(collection_method) %in% c("dive", "diving") ~ "dive",
+    tolower(collection_method) %in% c("snorkel", "snorkeling", "snrokel", "Snrokel") ~ "snorkel",
+    is.na(collection_method) | str_trim(collection_method) == "" ~ "not recorded",
+    TRUE ~ collection_method  # keep other values as-is
+))
+
+ouvea_data <- ouvea_data |> mutate(genus_species = genus_species |> 
+  str_trim() |>  # Remove leading/trailing whitespace
+  str_squish() |>  # Collapse multiple spaces into one
+  str_replace_all("_", " ") |>  # Replace underscores with spaces
+  str_replace_all("sp\\.?\\s*", "sp. ") |>  # Normalize "sp", "sp ", "sp.1"
+  str_replace_all("cf\\.?\\s*", "cf. ") |>  # Normalize "cf", "cf ", etc.
+  str_replace_all("aff\\.?\\s*", "aff. ") |>  # Normalize "aff", "aff "
+  str_remove_all("[[:punct:]]$") |>  # Remove trailing punctuation (e.g., a final ".")
+  str_to_lower() |>  # Make everything lowercase
+  str_to_sentence() ) # Capitalize only the first letter
+                                     
+                            
+specimens_per_day <- ouvea_data |> group_by(collection_method) |>   count(date_collected)
+species_per_day <- ouvea_data |> 
+  group_by(date_collected, collection_method) |> 
+  summarise(unique_species = n_distinct(genus_species))
+
+ouvea_data <- ouvea_data |>  arrange(date_collected)
+ouvea_data <- ouvea_data |>  mutate(new_species = !duplicated(genus_species))
+new_species_daily <- ouvea_data |> 
+  group_by(date_collected, collection_method) |> 
+  summarise(new_species = sum(new_species))
+```
+
+Main summarizing functions
+
+```{r}
+ggplot(specimens_per_day, aes(x = date_collected, y = n, 
+                              fill =collection_method,
+                              )) +
+  geom_col() +
+  labs(title = "Specimens Collected Per Day", 
+       x= "Date Collected", 
+       y= "Count",
+       fill="Collection Method")+
+  geom_text(aes(label = n), position = position_stack(vjust = 0.5))+
+scale_x_date(
+    date_breaks = "1 day",    # show a tick for each date
+    date_labels = "%e %b"     # format like "6 Jan", "7 Jan"
+)+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+ggplot(species_per_day, aes(x = date_collected, 
+                            y = unique_species, 
+                            fill=collection_method)) +
+  geom_col() +
+  labs(title = "Species Per Day", 
+       x= "Date Collected", 
+       y= "Count",
+       fill= "Collection Method")+
+  geom_text(aes(label = unique_species), position = position_stack(vjust = 0.5))+
+scale_x_date(
+    date_breaks = "1 day",    # show a tick for each date
+    date_labels = "%e %b"     # format like "6 Jan", "7 Jan"
+)+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+
+
+ggplot(new_species_daily, aes(x = date_collected, 
+                              y = new_species,
+                              color= collection_method)) +
+  geom_line() +
+  geom_point()+
+  labs(title = "New Species Per Day",
+     x= "Date Collected", 
+       y= "Count",
+       fill="Collection Method")+
+  geom_text(aes(label = new_species), position = position_stack(vjust = 0.1))+
+scale_x_date(
+    date_breaks = "1 day",    # show a tick for each date
+    date_labels = "%e %b"     # format like "6 Jan", "7 Jan"
+)+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
