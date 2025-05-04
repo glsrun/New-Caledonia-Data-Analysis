@@ -78,6 +78,15 @@ species_per_day <- ouvea_data |>
            fill = list(unique_species = 0)) |> 
   mutate(date_collected = as.Date(date_collected))
 
+#Daily New Species
+new_species_daily <- ouvea_data |> 
+  group_by(date_collected, collection_method) |> 
+  summarise(new_species = sum(new_species)) 
+
+new_species_daily <- new_species_daily |> 
+  mutate(vjust_pos = ifelse(collection_method == "snorkel", -2, 2))  
+  # Above for snorkel, below for dive
+
 
 #Running Specimens total over the whole trip
 cumulative_specimens_data <- ouvea_data |> 
@@ -176,8 +185,11 @@ Running Total Specimens
 
 ```{r}
 
-ggplot(cumulative_specimens_data, aes(x = date_collected, y = cumulative_specimens)) +
-  geom_line(color = "steelblue") +
+ggplot(cumulative_specimens_data, 
+       aes(x = date_collected, 
+           y = cumulative_specimens
+           )) +
+  geom_col(color = "steelblue") +
   geom_point(color = "steelblue") +
   labs(title = "Running Total of Specimens Collected",
        x = "Date Collected",
@@ -193,7 +205,7 @@ Running Total of Species
 #Running Total of the Number of Species Collected
 
 ggplot(cumulative_species_data, aes(x = date_collected, y = cumulative_species)) +
-  geom_line(color = "darkgreen") +
+  geom_col(color = "darkgreen") +
   geom_point(color = "darkgreen") +
   labs(title = "Running Total of Unique Species Collected",
        x = "Date Collected",
